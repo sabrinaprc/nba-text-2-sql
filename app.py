@@ -139,27 +139,30 @@ def text_to_sql(question: str) -> str:
 
 
 def fix_sql(question: str, bad_sql: str, result_text: str, reasoning: str) -> str:
-    response = get_groq().chat.completions.create(
-        model="groq/compound",
-        max_tokens=256,
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT + "\n\n" + FIX_PROMPT},
-            {"role": "user", "content": (
-                f"Question: {question}\n"
-                f"Bad SQL: {bad_sql}\n"
-                f"Result/Error: {result_text}\n"
-                f"Problem: {reasoning}\n"
-                f"Fixed SQL:"
-            )},
-        ],
-    )
-    return clean_sql(response.choices[0].message.content)
+    try:
+        response = get_groq().chat.completions.create(
+            model="groq/compound",
+            max_tokens=256,
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT + "\n\n" + FIX_PROMPT},
+                {"role": "user", "content": (
+                    f"Question: {question}\n"
+                    f"Bad SQL: {bad_sql}\n"
+                    f"Result/Error: {result_text}\n"
+                    f"Problem: {reasoning}\n"
+                    f"Fixed SQL:"
+                )},
+            ],
+        )
+        return clean_sql(response.choices[0].message.content)
+    except Exception:
+        return bad_sql
 
 
 def judge(question: str, sql: str, result_text: str) -> dict:
     response = get_groq().chat.completions.create(
         model="groq/compound",
-        max_tokens=128,
+        max_tokens=256,
         messages=[
             {"role": "system", "content": JUDGE_PROMPT},
             {"role": "user", "content": (
@@ -170,12 +173,18 @@ def judge(question: str, sql: str, result_text: str) -> dict:
         ],
     )
     raw = response.choices[0].message.content.strip()
-    try:
-        raw = re.sub(r"^```json\s*", "", raw)
-        raw = re.sub(r"```$", "", raw).strip()
-        return json.loads(raw)
-    except Exception:
-        return {"verdict": "INCORRECT", "reasoning": raw}
+    # Try to extract JSON from anywhere in the response
+    match = re.search(r'\{[^{}]*"verdict"[^{}]*\}', raw, re.DOTALL)
+    if match:
+        try:
+            return json.loads(match.group())
+        except Exception:
+            pass
+    # Fall back: look for verdict keyword directly in text
+    for verdict in ("CORRECT", "PARTIAL", "INCORRECT"):
+        if verdict in raw.upper():
+            return {"verdict": verdict, "reasoning": raw[:200]}
+    return {"verdict": "INCORRECT", "reasoning": raw[:200]}
 
 
 def run_sql(sql: str):
