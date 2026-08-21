@@ -119,18 +119,21 @@ def get_db_conn():
 def clean_sql(raw: str) -> str:
     raw = re.sub(r"```sql", "", raw, flags=re.IGNORECASE)
     raw = re.sub(r"```", "", raw)
-    raw = re.sub(r"^(A:|Answer:|SQL:|Query:)\s*", "", raw.strip(), flags=re.IGNORECASE)
     raw = re.sub(r"--[^\n]*", "", raw)
     raw = re.sub(r"/\*.*?\*/", "", raw, flags=re.DOTALL)
     raw = re.sub(r"\s+", " ", raw).strip()
+    # Extract SELECT statement from anywhere in the response
+    m = re.search(r"(SELECT\b.*)", raw, flags=re.IGNORECASE | re.DOTALL)
+    if m:
+        raw = m.group(1)
     if ";" in raw:
         raw = raw[: raw.index(";") + 1]
-    return raw
+    return raw.strip()
 
 
 def text_to_sql(question: str) -> str:
     response = get_groq().chat.completions.create(
-        model="groq/compound",
+        model="groq/compound-mini",
         max_tokens=256,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
@@ -143,7 +146,7 @@ def text_to_sql(question: str) -> str:
 def fix_sql(question: str, bad_sql: str, result_text: str, reasoning: str) -> str:
     try:
         response = get_groq().chat.completions.create(
-            model="groq/compound",
+            model="groq/compound-mini",
             max_tokens=256,
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT + "\n\n" + FIX_PROMPT},
@@ -165,7 +168,7 @@ def judge(question: str, sql: str, result_text: str) -> dict:
     for attempt in range(3):
         try:
             response = get_groq().chat.completions.create(
-                model="groq/compound",
+                model="groq/compound-mini",
                 max_tokens=256,
                 messages=[
                     {"role": "system", "content": JUDGE_PROMPT},
