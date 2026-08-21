@@ -1,10 +1,12 @@
 import os
 import re
 import json
+import time
 import psycopg2
 import pandas as pd
 import streamlit as st
 from groq import Groq
+from groq import RateLimitError
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -160,18 +162,25 @@ def fix_sql(question: str, bad_sql: str, result_text: str, reasoning: str) -> st
 
 
 def judge(question: str, sql: str, result_text: str) -> dict:
-    response = get_groq().chat.completions.create(
-        model="groq/compound",
-        max_tokens=256,
-        messages=[
-            {"role": "system", "content": JUDGE_PROMPT},
-            {"role": "user", "content": (
-                f"Question: {question}\n"
-                f"SQL: {sql}\n"
-                f"Result: {result_text}"
-            )},
-        ],
-    )
+    for attempt in range(3):
+        try:
+            response = get_groq().chat.completions.create(
+                model="groq/compound",
+                max_tokens=256,
+                messages=[
+                    {"role": "system", "content": JUDGE_PROMPT},
+                    {"role": "user", "content": (
+                        f"Question: {question}\n"
+                        f"SQL: {sql}\n"
+                        f"Result: {result_text}"
+                    )},
+                ],
+            )
+            break
+        except RateLimitError:
+            if attempt == 2:
+                return {"verdict": "PARTIAL", "reasoning": "Rate limit reached — skipping judge."}
+            time.sleep(10)
     raw = response.choices[0].message.content.strip()
     # Try to extract JSON from anywhere in the response
     match = re.search(r'\{[^{}]*"verdict"[^{}]*\}', raw, re.DOTALL)
@@ -280,6 +289,7 @@ if (ask or clicked) and question.strip():
 
         result_text = rows_to_text(col_names, rows) if not err else f"ERROR: {err}"
 
+        time.sleep(3)  # avoid rate limit between generate and judge calls
         with st.spinner("Judging result..."):
             verdict_data = judge(q, sql, result_text)
 
