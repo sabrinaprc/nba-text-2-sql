@@ -241,7 +241,9 @@ def show_attempt(n: int, sql: str, col_names, rows, err, verdict_data: dict):
                 df[c] = df[c].round(2)
             st.dataframe(df, use_container_width=True, hide_index=True)
             st.caption(f"{len(rows)} row{'s' if len(rows) != 1 else ''} returned")
-        st.markdown(f"**Judge:** :{color}[{icon} {verdict}] — {reasoning}")
+        # Strip any markdown tables/bullets from reasoning so it renders as plain text
+        clean_reasoning = reasoning.split("\n")[0].strip()
+        st.markdown(f"**Judge:** :{color}[{icon} {verdict}] — {clean_reasoning}")
 
 
 # ── Page config ───────────────────────────────────────────────────────────────
