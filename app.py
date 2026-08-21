@@ -128,7 +128,7 @@ def clean_sql(raw: str) -> str:
 
 def text_to_sql(question: str) -> str:
     response = get_groq().chat.completions.create(
-        model="llama-3.3-70b-versatile",
+        model="groq/compound",
         max_tokens=256,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
@@ -140,7 +140,7 @@ def text_to_sql(question: str) -> str:
 
 def fix_sql(question: str, bad_sql: str, result_text: str, reasoning: str) -> str:
     response = get_groq().chat.completions.create(
-        model="llama-3.3-70b-versatile",
+        model="groq/compound",
         max_tokens=256,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT + "\n\n" + FIX_PROMPT},
@@ -158,7 +158,7 @@ def fix_sql(question: str, bad_sql: str, result_text: str, reasoning: str) -> st
 
 def judge(question: str, sql: str, result_text: str) -> dict:
     response = get_groq().chat.completions.create(
-        model="llama-3.3-70b-versatile",
+        model="groq/compound",
         max_tokens=128,
         messages=[
             {"role": "system", "content": JUDGE_PROMPT},
