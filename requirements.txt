@@ -1,0 +1,5 @@
+streamlit==1.61.1
+groq==1.2.0
+psycopg2-binary==2.9.11
+pandas==3.0.0
+python-dotenv==1.0.0
